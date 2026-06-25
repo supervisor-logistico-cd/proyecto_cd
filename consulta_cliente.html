@@ -11,7 +11,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://proyecto-cd.onrender.com">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="icon" href="favicon.png" type="image/png">
 
   <!-- Tipografía -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -625,6 +625,16 @@
   function pintarMapa(lat, lng, nombre){
     var wrap = document.getElementById('mapWrap');
     var coords = document.getElementById('dCoords');
+
+    // Defensive parsing: ensure numeric and convert common formats
+    try{
+      if(lat !== null && lat !== undefined) lat = Number(String(lat).replace(',', '.'));
+      if(lng !== null && lng !== undefined) lng = Number(String(lng).replace(',', '.'));
+    }catch(e){ }
+
+    // If values look like microdegrees (very large), scale them down
+    if(!isNaN(lat) && Math.abs(lat) > 90) lat = lat / 1e6;
+    if(!isNaN(lng) && Math.abs(lng) > 180) lng = lng / 1e6;
 
     if(lat === null || lng === null || isNaN(lat) || isNaN(lng)){
       if(map){ map.remove(); map=null; }
