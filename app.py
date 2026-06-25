@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_from_directory, redirect, url_for
 
 PROJECT_ROOT = Path(__file__).parent
 DB_PATH = PROJECT_ROOT / "clientes.db"
@@ -30,7 +30,12 @@ def get_db_connection() -> sqlite3.Connection:
 
 @app.route("/")
 def index():
-    return render_template("consulta_cliente.html")
+    return redirect(url_for('consulta_clientes'))
+
+
+@app.route('/consulta-clientes')
+def consulta_clientes():
+    return render_template('consulta_cliente.html')
 
 
 @app.route("/api/indice")
