@@ -85,11 +85,29 @@ def api_detalle():
 
         def parse_float(value):
             try:
-                v = float(value)
-                # algunos datos vienen en "microgrados" (ej. 7075039 -> 7.075039)
-                if abs(v) > 90:
-                    v = v / 1e6
-                return v
+                s = str(value).strip().replace(',', '.')
+                v = float(s)
+                # valores plausibles ya en grados
+                if -90 <= v <= 90:
+                    return v
+                # intentar divisores comunes: 1e6 (microgrados) preferido si da valor >=1
+                v6 = v / 1e6
+                if -90 <= v6 <= 90 and abs(v6) >= 1:
+                    return v6
+                # probar 1e5 (posible falta de un decimal)
+                v5 = v / 1e5
+                if -90 <= v5 <= 90 and abs(v5) >= 1:
+                    return v5
+                # si ninguno >=1, escoger el que quede en rango -90..90 con valor más grande
+                candidates = []
+                if -90 <= v6 <= 90:
+                    candidates.append(v6)
+                if -90 <= v5 <= 90:
+                    candidates.append(v5)
+                if candidates:
+                    # elegir candidato con mayor magnitud
+                    return max(candidates, key=lambda x: abs(x))
+                return v6 if -90 <= v6 <= 90 else (v5 if -90 <= v5 <= 90 else None)
             except Exception:
                 return None
 
