@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Consulta de Clientes</title>
+
+  <!-- Tipografía -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet (mapa) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    :root{
+      --bg:#0f1226;
+      --bg2:#171a35;
+      --grad1:#6d5efc;
+      --grad2:#9b5cf6;
+      --grad3:#5ec8fc;
+      --card:#ffffff;
+      --ink:#14162b;
+      --muted:#6b7090;
+      --line:#eceeffa8;
+      --line2:#e7e9f5;
+      --green:#22c55e;
+      --blue:#3b82f6;
+      --red:#ef4444;
+      --soft:#f4f5fb;
+      --shadow:0 10px 30px rgba(20,22,60,.12);
+      --radius:20px;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    html,body{margin:0;padding:0;}
+    body{
+      font-family:'Inter',system-ui,-apple-system,sans-serif;
+      background:
+        radial-gradient(1200px 600px at 100% -10%, rgba(94,200,252,.18), transparent 60%),
+        radial-gradient(900px 500px at -10% 0%, rgba(155,92,246,.20), transparent 55%),
+        linear-gradient(180deg,var(--bg) 0%, var(--bg2) 100%);
+      color:var(--ink);
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+
+    /* ===== Barra superior ===== */
+    .appbar{
+      position:sticky;top:0;z-index:40;
+      display:flex;align-items:center;gap:14px;
+      padding:16px 18px;
+      background:rgba(15,18,38,.65);
+      backdrop-filter:blur(14px);
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .burger{
+      width:44px;height:44px;flex:0 0 auto;
+      border:none;border-radius:14px;cursor:pointer;
+      background:rgba(255,255,255,.10);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+      transition:.2s;
+    }
+    .burger:active{transform:scale(.94);}
+    .burger span{width:20px;height:2.4px;border-radius:3px;background:#fff;display:block;transition:.25s;}
+    .appbar h1{
+      font-size:18px;font-weight:700;color:#fff;margin:0;letter-spacing:.2px;
+      display:flex;align-items:center;gap:10px;
+    }
+    .appbar h1 .dot{width:9px;height:9px;border-radius:50%;
+      background:linear-gradient(135deg,var(--grad1),var(--grad3));box-shadow:0 0 12px var(--grad1);}
+
+    /* ===== Drawer ===== */
+    .overlay{
+      position:fixed;inset:0;background:rgba(5,6,20,.55);
+      opacity:0;visibility:hidden;transition:.25s;z-index:50;backdrop-filter:blur(2px);
+    }
+    .overlay.show{opacity:1;visibility:visible;}
+    .drawer{
+      position:fixed;top:0;left:0;height:100%;width:80%;max-width:320px;z-index:60;
+      background:linear-gradient(180deg,#15183a,#0f1226);
+      transform:translateX(-105%);transition:transform .3s cubic-bezier(.22,.8,.2,1);
+      padding:22px 16px;display:flex;flex-direction:column;
+      box-shadow:18px 0 50px rgba(0,0,0,.4);
+    }
+    .drawer.show{transform:translateX(0);}
+    .drawer .brand{display:flex;align-items:center;gap:12px;padding:8px 8px 22px;}
+    .drawer .brand .logo{
+      width:42px;height:42px;border-radius:13px;
+      background:linear-gradient(135deg,var(--grad1),var(--grad2),var(--grad3));
+      display:flex;align-items:center;justify-content:center;font-size:20px;
+      box-shadow:0 8px 20px rgba(109,94,252,.5);
+    }
+    .drawer .brand b{color:#fff;font-size:16px;display:block;}
+    .drawer .brand small{color:#9aa0c7;font-size:12px;}
+    .navitem{
+      display:flex;align-items:center;gap:14px;
+      padding:14px 14px;border-radius:14px;cursor:pointer;color:#c9cdf0;
+      font-weight:600;font-size:15px;margin-bottom:6px;border:1px solid transparent;transition:.18s;
+    }
+    .navitem .ic{font-size:19px;width:24px;text-align:center;}
+    .navitem:active{transform:scale(.98);}
+    .navitem.active{
+      background:linear-gradient(135deg,rgba(109,94,252,.22),rgba(94,200,252,.16));
+      color:#fff;border-color:rgba(255,255,255,.10);
+    }
+    .navitem .badge{margin-left:auto;font-size:10px;font-weight:700;color:#0f1226;
+      background:#5ec8fc;border-radius:8px;padding:3px 7px;}
+    .drawer .foot{margin-top:auto;color:#666c95;font-size:11px;text-align:center;padding:14px 0 4px;}
+
+    /* ===== Contenido ===== */
+    .wrap{max-width:680px;margin:0 auto;padding:18px 16px 60px;}
+
+    .view{display:none;animation:fade .35s ease;}
+    .view.active{display:block;}
+    @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+    /* Buscador */
+    .search-card{
+      background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:16px;position:relative;z-index:20;
+    }
+    .search-title{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px 2px;}
+    .search-box{
+      display:flex;align-items:center;gap:10px;
+      background:var(--soft);border:1.5px solid var(--line2);
+      border-radius:14px;padding:12px 14px;transition:.18s;
+    }
+    .search-box:focus-within{border-color:var(--grad1);box-shadow:0 0 0 4px rgba(109,94,252,.14);}
+    .search-box svg{flex:0 0 auto;}
+    .search-box input{
+      border:none;outline:none;background:transparent;width:100%;
+      font-size:16px;font-family:inherit;color:var(--ink);font-weight:500;
+    }
+    .search-box input::placeholder{color:#a3a8c8;font-weight:400;}
+    .clearbtn{border:none;background:transparent;color:#b3b8d6;font-size:20px;cursor:pointer;display:none;padding:0 2px;}
+    .clearbtn.show{display:block;}
+
+    .suggest{
+      list-style:none;margin:8px 0 0;padding:6px;border-radius:14px;
+      background:#fff;box-shadow:var(--shadow);max-height:330px;overflow:auto;
+      border:1px solid var(--line2);display:none;
+    }
+    .suggest.show{display:block;}
+    .suggest li{
+      padding:12px 12px;border-radius:11px;cursor:pointer;transition:.12s;
+      display:flex;flex-direction:column;gap:2px;
+    }
+    .suggest li:active{background:var(--soft);}
+    .suggest li:hover{background:var(--soft);}
+    .suggest .nom{font-weight:600;font-size:14px;color:var(--ink);}
+    .suggest .cod{font-size:12px;color:var(--muted);}
+    .suggest .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px;cursor:default;}
+    .suggest .empty:hover{background:transparent;}
+    mark{background:rgba(155,92,246,.22);color:inherit;border-radius:3px;padding:0 1px;}
+
+    /* Guía de puntos */
+    .legend{
+      display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;
+    }
+    .legend .lg{
+      display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:#cfd3f2;
+      background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+      padding:7px 11px;border-radius:999px;
+    }
+    .pt{width:11px;height:11px;border-radius:50%;flex:0 0 auto;}
+    .pt.g{background:var(--green);box-shadow:0 0 8px var(--green);}
+    .pt.b{background:var(--blue);box-shadow:0 0 8px var(--blue);}
+    .pt.r{background:var(--red);box-shadow:0 0 8px var(--red);}
+
+    /* Estados de carga / vacío */
+    .hint{
+      margin-top:22px;text-align:center;color:#aab0d8;font-size:14px;line-height:1.6;
+      padding:26px 16px;
+    }
+    .hint .big{font-size:40px;display:block;margin-bottom:8px;filter:grayscale(.1);}
+    .spin{
+      width:26px;height:26px;border-radius:50%;
+      border:3px solid rgba(255,255,255,.25);border-top-color:#fff;
+      animation:rot .8s linear infinite;display:inline-block;vertical-align:middle;
+    }
+    @keyframes rot{to{transform:rotate(360deg);}}
+
+    /* Tarjeta detalle */
+    .detail{margin-top:18px;display:none;}
+    .detail.show{display:block;animation:fade .35s ease;}
+    .card{
+      background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+      overflow:hidden;margin-bottom:16px;
+    }
+    .card-head{
+      background:linear-gradient(135deg,var(--grad1),var(--grad2) 55%,var(--grad3));
+      color:#fff;padding:20px 18px 18px;position:relative;
+    }
+    .card-head .cod-chip{
+      display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;
+      background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.25);
+      padding:5px 10px;border-radius:999px;margin-bottom:10px;
+    }
+    .card-head h2{margin:0;font-size:21px;font-weight:800;line-height:1.25;}
+    .card-head .own{margin-top:6px;font-size:13.5px;color:rgba(255,255,255,.86);font-weight:500;}
+
+    /* chips estado activos */
+    .status-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;}
+    .chip{
+      display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;
+      padding:7px 11px;border-radius:999px;
+      background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;
+      opacity:.42;filter:saturate(.4);transition:.2s;
+    }
+    .chip.on{opacity:1;filter:none;background:rgba(255,255,255,.96);color:var(--ink);box-shadow:0 6px 16px rgba(0,0,0,.18);}
+    .chip .pt{width:10px;height:10px;}
+
+    .rows{padding:6px 6px 14px;}
+    .row{display:flex;align-items:flex-start;gap:13px;padding:13px 12px;border-bottom:1px solid var(--line2);}
+    .row:last-child{border-bottom:none;}
+    .row .ic{
+      width:38px;height:38px;flex:0 0 auto;border-radius:11px;
+      background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:17px;
+    }
+    .row .meta{flex:1;min-width:0;}
+    .row .lab{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);}
+    .row .val{font-size:15px;font-weight:600;color:var(--ink);margin-top:2px;word-break:break-word;line-height:1.35;}
+    .row .val.empty{color:#b8bdd8;font-weight:500;font-style:italic;}
+    .eta-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:3px;}
+    .eta-pills .ep{background:var(--soft);border:1px solid var(--line2);border-radius:10px;padding:5px 10px;font-size:13px;font-weight:700;}
+    .eta-pills .ep span{color:var(--muted);font-weight:600;font-size:10px;display:block;text-transform:uppercase;letter-spacing:.4px;}
+
+    .tel-actions{display:flex;gap:8px;margin-top:7px;}
+    .tel-actions a{
+      text-decoration:none;font-size:12px;font-weight:700;padding:7px 12px;border-radius:10px;
+      display:inline-flex;align-items:center;gap:6px;
+    }
+    .tel-actions a.call{background:#eef0ff;color:#4f46e5;}
+    .tel-actions a.wa{background:#e7f9ee;color:#15803d;}
+
+    /* Mapa */
+    .map-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+    .map-card .mh{padding:14px 16px 10px;display:flex;align-items:center;gap:9px;}
+    .map-card .mh b{font-size:14px;}
+    .map-card .mh .ic{font-size:17px;}
+    #map{height:280px;width:100%;background:#dde3f0;}
+    .map-card .coords{padding:10px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line2);
+      display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .map-empty{height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;flex-direction:column;gap:6px;}
+
+    /* Módulo 2 placeholder */
+    .soon{
+      background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:46px 22px;text-align:center;margin-top:18px;
+    }
+    .soon .em{font-size:52px;display:block;margin-bottom:14px;}
+    .soon h3{margin:0 0 8px;font-size:19px;color:var(--ink);}
+    .soon p{margin:0;color:var(--muted);font-size:14px;line-height:1.6;}
+
+    /* Formulario actualizar */
+    .field{padding:14px 12px 4px;}
+    .field label{display:block;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+    .field input{
+      width:100%;font-family:inherit;font-size:16px;font-weight:600;color:var(--ink);
+      background:var(--soft);border:1.5px solid var(--line2);border-radius:13px;
+      padding:13px 14px;outline:none;transition:.18s;
+    }
+    .field input:focus{border-color:var(--grad1);box-shadow:0 0 0 4px rgba(109,94,252,.14);background:#fff;}
+    .field input::placeholder{color:#a3a8c8;font-weight:400;}
+    .save-btn{
+      margin:16px 12px 6px;width:calc(100% - 24px);border:none;cursor:pointer;
+      font-family:inherit;font-size:16px;font-weight:800;color:#fff;
+      padding:15px;border-radius:14px;
+      background:linear-gradient(135deg,var(--grad1),var(--grad2) 60%,var(--grad3));
+      box-shadow:0 10px 24px rgba(109,94,252,.4);transition:.18s;
+    }
+    .save-btn:active{transform:scale(.98);}
+    .save-btn:disabled{opacity:.6;cursor:default;box-shadow:none;}
+    .msg{margin:8px 12px 14px;font-size:13.5px;font-weight:600;text-align:center;border-radius:12px;padding:0;max-height:0;overflow:hidden;transition:.25s;}
+    .msg.show{padding:12px;max-height:90px;}
+    .msg.ok{background:#e7f9ee;color:#15803d;}
+    .msg.err{background:#fdeaea;color:#b91c1c;}
+
+    .leaflet-container{font-family:inherit;}
+  </style>
+</head>
+<body>
+
+  <!-- Barra superior -->
+  <header class="appbar">
+    <button class="burger" id="burger" aria-label="Menú"><span></span><span></span><span></span></button>
+    <h1><span class="dot"></span><span id="appTitle">Consultar clientes</span></h1>
+  </header>
+
+  <!-- Drawer -->
+  <div class="overlay" id="overlay"></div>
+  <nav class="drawer" id="drawer">
+    <div class="brand">
+      <div class="logo">📦</div>
+      <div><b>Clientes BEES</b><small>Centro de distribución</small></div>
+    </div>
+    <div class="navitem active" data-view="consultar">
+      <span class="ic">🔎</span> Consultar cliente
+    </div>
+    <div class="navitem" data-view="actualizar">
+      <span class="ic">✏️</span> Actualizar contacto <span class="badge">NEW</span>
+    </div>
+    <div class="foot">v1.0 · Centro de distribución Barrancabermeja</div>
+  </nav>
+
+  <!-- Contenido -->
+  <div class="wrap">
+
+    <!-- ===== MÓDULO 1: CONSULTAR ===== -->
+    <section class="view active" id="view-consultar">
+      <div class="search-card">
+        <p class="search-title">Buscar por código o nombre del cliente</p>
+        <div class="search-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9b5cf6" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="q" type="text" inputmode="search" autocomplete="off" placeholder="Ej: 12749449 o Tienda La Playa">
+          <button class="clearbtn" id="clearBtn">&times;</button>
+        </div>
+        <ul class="suggest" id="suggest"></ul>
+
+        <div class="legend">
+          <div class="lg"><span class="pt g"></span> Cashless</div>
+          <div class="lg"><span class="pt b"></span> NPS (predictiva)</div>
+          <div class="lg"><span class="pt r"></span> Rechazos</div>
+        </div>
+      </div>
+
+      <div class="hint" id="hint">
+        <span class="big">🗂️</span>
+        Escribe arriba para encontrar un cliente.<br>Las sugerencias aparecen mientras escribes.
+      </div>
+
+      <!-- Detalle -->
+      <div class="detail" id="detail">
+        <div class="card">
+          <div class="card-head">
+            <span class="cod-chip" id="dCod">—</span>
+            <h2 id="dCliente">—</h2>
+            <div class="own" id="dProp">—</div>
+            <div class="status-row" id="dStatus"></div>
+          </div>
+          <div class="rows" id="dRows"></div>
+        </div>
+
+        <div class="map-card">
+          <div class="mh"><span class="ic">📍</span><b>Ubicación del cliente</b></div>
+          <div id="mapWrap"></div>
+          <div class="coords" id="dCoords"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MÓDULO 2: ACTUALIZAR ===== -->
+    <section class="view" id="view-actualizar">
+      <div class="search-card">
+        <p class="search-title">Buscar cliente a actualizar</p>
+        <div class="search-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9b5cf6" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="q2" type="text" inputmode="search" autocomplete="off" placeholder="Código o nombre del cliente">
+          <button class="clearbtn" id="clearBtn2">&times;</button>
+        </div>
+        <ul class="suggest" id="suggest2"></ul>
+      </div>
+
+      <div class="hint" id="hint2">
+        <span class="big">✏️</span>
+        Busca un cliente para actualizar su número de contacto.
+      </div>
+
+      <!-- Formulario de actualización -->
+      <div class="detail" id="formCard">
+        <div class="card">
+          <div class="card-head">
+            <span class="cod-chip" id="uCod">—</span>
+            <h2 id="uCliente">—</h2>
+            <div class="own" id="uCom">—</div>
+          </div>
+          <div class="rows">
+            <div class="row">
+              <div class="ic">📞</div>
+              <div class="meta">
+                <div class="lab">Número actual</div>
+                <div class="val" id="uActual">—</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="uNuevo">📱 Nuevo número</label>
+              <input id="uNuevo" type="tel" inputmode="numeric" maxlength="13" placeholder="Ej: 3001234567">
+            </div>
+
+            <div class="field">
+              <label for="uEncargado">🙋 ¿Quién está actualizando?</label>
+              <input id="uEncargado" type="text" autocomplete="name" placeholder="Tu nombre">
+            </div>
+
+            <button class="save-btn" id="saveBtn">💾 Guardar actualización</button>
+            <div class="msg" id="uMsg"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  /* ============ NAV / DRAWER ============ */
+  var drawer  = document.getElementById('drawer');
+  var overlay = document.getElementById('overlay');
+  function openMenu(){ drawer.classList.add('show'); overlay.classList.add('show'); }
+  function closeMenu(){ drawer.classList.remove('show'); overlay.classList.remove('show'); }
+  document.getElementById('burger').addEventListener('click', openMenu);
+  overlay.addEventListener('click', closeMenu);
+
+  document.querySelectorAll('.navitem').forEach(function(it){
+    it.addEventListener('click', function(){
+      var v = it.getAttribute('data-view');
+      document.querySelectorAll('.navitem').forEach(function(n){ n.classList.remove('active'); });
+      it.classList.add('active');
+      document.querySelectorAll('.view').forEach(function(s){ s.classList.remove('active'); });
+      document.getElementById('view-' + v).classList.add('active');
+      document.getElementById('appTitle').textContent = (v === 'consultar') ? 'Consultar clientes' : 'Actualizar contacto';
+      closeMenu();
+      if (v === 'consultar' && map) setTimeout(function(){ map.invalidateSize(); }, 250);
+    });
+  });
+
+  /* ============ ÍNDICE / BÚSQUEDA (reutilizable) ============ */
+  var INDEX = [];
+  var listo = false;
+  var hint  = document.getElementById('hint');
+  var hint2 = document.getElementById('hint2');
+
+  function quitarAcentos(s){
+    return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function fetchJSON(url, options) {
+    return fetch(url, options).then(function(response) {
+      if (!response.ok) throw new Error('Error de red: ' + response.status);
+      return response.json();
+    });
+  }
+
+  // Carga el índice al abrir (compartido por los dos módulos)
+  hint.innerHTML  = '<span class="spin"></span><br><br>Cargando base de clientes…';
+  fetchJSON('/api/indice')
+    .then(function(data){
+      INDEX = data || [];
+      listo = true;
+      hint.innerHTML = '<span class="big">🗂️</span>' + INDEX.length.toLocaleString('es-CO') +
+        ' clientes listos.<br>Escribe un código o nombre para empezar.';
+    })
+    .catch(function(err){
+      hint.innerHTML = '<span class="big">⚠️</span>No se pudo cargar la base.<br>' + (err && err.message ? err.message : '');
+    });
+
+  function resaltar(texto, term){
+    if(!term) return texto;
+    var t = quitarAcentos(texto), nt = quitarAcentos(term);
+    var i = t.indexOf(nt);
+    if(i < 0) return texto;
+    return texto.substring(0,i) + '<mark>' + texto.substring(i, i+term.length) + '</mark>' + texto.substring(i+term.length);
+  }
+
+  // Configura un buscador con autocompletar sobre el INDEX compartido
+  function setupBuscador(inputId, suggestId, clearId, onSelect){
+    var input   = document.getElementById(inputId);
+    var suggest = document.getElementById(suggestId);
+    var clearEl = document.getElementById(clearId);
+
+    function buscar(term){
+      var nt = quitarAcentos(term.trim());
+      if(!nt){ suggest.classList.remove('show'); suggest.innerHTML=''; return; }
+      if(!listo){
+        suggest.innerHTML = '<li class="empty"><span class="spin"></span>&nbsp; Cargando…</li>';
+        suggest.classList.add('show'); return;
+      }
+      var res = [];
+      for(var i=0; i<INDEX.length && res.length<14; i++){
+        var c = INDEX[i];
+        if(c.c.indexOf(nt) !== -1 || quitarAcentos(c.n).indexOf(nt) !== -1) res.push(c);
+      }
+      if(res.length === 0){
+        suggest.innerHTML = '<li class="empty">Sin resultados para “' + term + '”</li>';
+      } else {
+        suggest.innerHTML = res.map(function(c){
+          return '<li data-c="'+c.c+'">' +
+                   '<span class="nom">'+resaltar(c.n || '(sin nombre)', term)+'</span>' +
+                   '<span class="cod">Cód. '+resaltar(c.c, term)+'</span>' +
+                 '</li>';
+        }).join('');
+      }
+      suggest.classList.add('show');
+    }
+
+    input.addEventListener('input', function(){
+      clearEl.classList.toggle('show', input.value.length > 0);
+      buscar(input.value);
+    });
+    input.addEventListener('focus', function(){ if(input.value) buscar(input.value); });
+
+    clearEl.addEventListener('click', function(){
+      input.value=''; clearEl.classList.remove('show');
+      suggest.classList.remove('show'); suggest.innerHTML='';
+      input.focus();
+    });
+
+    suggest.addEventListener('click', function(e){
+      var li = e.target.closest('li[data-c]');
+      if(!li) return;
+      input.value=''; clearEl.classList.remove('show');
+      suggest.classList.remove('show');
+      onSelect(li.getAttribute('data-c'));
+    });
+
+    return { input: input, suggest: suggest, clear: clearEl };
+  }
+
+  // Cerrar sugerencias al tocar afuera de cualquier buscador
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.search-card')){
+      document.querySelectorAll('.suggest').forEach(function(s){ s.classList.remove('show'); });
+    }
+  });
+
+  // Instancias
+  setupBuscador('q',  'suggest',  'clearBtn',  seleccionar);
+  setupBuscador('q2', 'suggest2', 'clearBtn2', seleccionarContacto);
+
+  /* ============ DETALLE ============ */
+  var detail = document.getElementById('detail');
+
+  function seleccionar(cod){
+    hint.innerHTML = '<span class="spin"></span><br><br>Consultando cliente…';
+    hint.style.display = 'block';
+    detail.classList.remove('show');
+
+    fetchJSON('/api/detalle?codigo=' + encodeURIComponent(cod))
+      .then(pintarDetalle)
+      .catch(function(err){
+        hint.innerHTML = '<span class="big">⚠️</span>Error: ' + (err && err.message ? err.message : 'desconocido');
+      });
+  }
+
+  function fila(icon, label, value, isHtml){
+    var v = (value === null || value === undefined || String(value).trim() === '')
+      ? '<div class="val empty">No registra</div>'
+      : (isHtml ? value : '<div class="val">' + String(value) + '</div>');
+    return '<div class="row"><div class="ic">'+icon+'</div><div class="meta">' +
+           '<div class="lab">'+label+'</div>'+v+'</div></div>';
+  }
+
+  function pintarDetalle(d){
+    if(!d || !d.ok){
+      hint.innerHTML = '<span class="big">😕</span>' + (d && d.msg ? d.msg : 'Cliente no encontrado.');
+      return;
+    }
+    hint.style.display = 'none';
+
+    document.getElementById('dCod').textContent = 'CÓD. ' + (d.codigo || '—');
+    document.getElementById('dCliente').textContent = d.cliente || '(sin nombre)';
+    document.getElementById('dProp').textContent = '👤 ' + (d.propietario || 'Propietario no registra');
+
+    // Estado (chips)
+    var st = d.estado || {};
+    document.getElementById('dStatus').innerHTML =
+      '<div class="chip '+(st.cashless?'on':'')+'"><span class="pt g"></span>Cashless</div>' +
+      '<div class="chip '+(st.nps?'on':'')+'"><span class="pt b"></span>NPS</div>' +
+      '<div class="chip '+(st.rechazo?'on':'')+'"><span class="pt r"></span>Rechazos</div>';
+
+    // Filas de info
+    var rows = '';
+    rows += fila('🧑‍💼','COM / Representante',
+            (d.representante ? d.representante : '') + (d.com ? '  ·  '+d.com : ''));
+    rows += fila('🏙️','Municipio', d.municipio);
+    rows += fila('🏘️','Barrio', d.barrio);
+    rows += fila('🗺️','Dirección', d.direccion);
+    rows += fila('📅','Días de entrega', d.dias_entrega);
+
+    // ETA
+    if(d.eta_inicia || d.eta_final){
+      var eta = '<div class="eta-pills">' +
+        (d.eta_inicia ? '<div class="ep"><span>Inicia</span>'+d.eta_inicia+'</div>' : '') +
+        (d.eta_final  ? '<div class="ep"><span>Final</span>'+d.eta_final+'</div>' : '') +
+        '</div>';
+      rows += fila('⏰','Hora estimada de entrega', eta, true);
+    } else {
+      rows += fila('⏰','Hora estimada de entrega', '');
+    }
+
+    // Teléfono con acciones
+    if(d.telefono){
+      var waNum = d.telefono.length === 10 ? '57'+d.telefono : d.telefono;
+      var tel = '<div class="val">'+d.telefono+'</div>' +
+        '<div class="tel-actions">' +
+          '<a class="call" href="tel:'+d.telefono+'">📞 Llamar</a>' +
+          '<a class="wa" target="_blank" href="https://wa.me/'+waNum+'">💬 WhatsApp</a>' +
+        '</div>';
+      rows += fila('📱','Teléfono', tel, true);
+    } else {
+      rows += fila('📱','Teléfono', '');
+    }
+
+    document.getElementById('dRows').innerHTML = rows;
+
+    // Mapa
+    pintarMapa(d.lat, d.lng, d.cliente);
+
+    detail.classList.add('show');
+    detail.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  /* ============ MAPA (Leaflet) ============ */
+  var map = null, marker = null;
+  function pintarMapa(lat, lng, nombre){
+    var wrap = document.getElementById('mapWrap');
+    var coords = document.getElementById('dCoords');
+
+    if(lat === null || lng === null || isNaN(lat) || isNaN(lng)){
+      if(map){ map.remove(); map=null; }
+      wrap.innerHTML = '<div class="map-empty">📍<br>Sin coordenadas registradas</div>';
+      coords.innerHTML = '';
+      return;
+    }
+
+    if(!document.getElementById('map') || !map){
+      wrap.innerHTML = '<div id="map"></div>';
+      map = L.map('map', {zoomControl:true, attributionControl:true}).setView([lat,lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19, attribution:'© OpenStreetMap'
+      }).addTo(map);
+      marker = L.marker([lat,lng]).addTo(map);
+    } else {
+      map.setView([lat,lng], 16);
+      if(marker) marker.setLatLng([lat,lng]); else marker = L.marker([lat,lng]).addTo(map);
+    }
+    marker.bindPopup('<b>'+(nombre||'Cliente')+'</b>');
+    setTimeout(function(){ map.invalidateSize(); }, 200);
+
+    coords.innerHTML =
+      '<span>Lat: <b>'+lat.toFixed(6)+'</b> · Lng: <b>'+lng.toFixed(6)+'</b></span>' +
+      '<a href="https://www.google.com/maps?q='+lat+','+lng+'" target="_blank" style="color:#6d5efc;font-weight:700;text-decoration:none;">Abrir en Maps ↗</a>';
+  }
+
+  /* ============ MÓDULO 2: ACTUALIZAR CONTACTO ============ */
+  var formCard   = document.getElementById('formCard');
+  var clienteSel = null; // {codigo, cliente, com, telefono}
+
+  function seleccionarContacto(cod){
+    hint2.innerHTML = '<span class="spin"></span><br><br>Cargando contacto…';
+    hint2.style.display = 'block';
+    formCard.classList.remove('show');
+
+    fetchJSON('/api/contacto?codigo=' + encodeURIComponent(cod))
+      .then(function(d){
+        if(!d || !d.ok){
+          hint2.innerHTML = '<span class="big">😕</span>' + (d && d.msg ? d.msg : 'No encontrado.');
+          return;
+        }
+        clienteSel = d;
+        hint2.style.display = 'none';
+
+        document.getElementById('uCod').textContent = 'CÓD. ' + (d.codigo || '—');
+        document.getElementById('uCliente').textContent = d.cliente || '(sin nombre)';
+        document.getElementById('uCom').textContent = d.com ? ('COM · ' + d.com) : 'Sin COM';
+        var ua = document.getElementById('uActual');
+        if(d.telefono){ ua.textContent = d.telefono; ua.classList.remove('empty'); }
+        else { ua.textContent = 'No registra'; ua.classList.add('empty'); }
+
+        // limpiar formulario
+        document.getElementById('uNuevo').value = '';
+        document.getElementById('uMsg').className = 'msg';
+        document.getElementById('saveBtn').disabled = false;
+
+        formCard.classList.add('show');
+        formCard.scrollIntoView({behavior:'smooth', block:'start'});
+      })
+      .catch(function(err){
+        hint2.innerHTML = '<span class="big">⚠️</span>Error: ' + (err && err.message ? err.message : 'desconocido');
+      });
+  }
+
+  // Solo dígitos en el campo de número
+  document.getElementById('uNuevo').addEventListener('input', function(){
+    this.value = this.value.replace(/\D/g, '');
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', function(){
+    if(!clienteSel) return;
+    var nuevo = document.getElementById('uNuevo').value.trim();
+    var encargado = document.getElementById('uEncargado').value.trim();
+    var msg = document.getElementById('uMsg');
+    var btn = this;
+
+    function showMsg(texto, tipo){ msg.textContent = texto; msg.className = 'msg show ' + tipo; }
+
+    if(nuevo.length < 7){ showMsg('⚠️ Ingresa un número válido.', 'err'); return; }
+    if(!encargado){ showMsg('⚠️ Indica quién está actualizando.', 'err'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+
+    fetchJSON('/api/guardar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        codigo: clienteSel.codigo,
+        cliente: clienteSel.cliente,
+        com: clienteSel.com,
+        numero_actual: clienteSel.telefono || '',
+        numero_nuevo: nuevo,
+        encargado: encargado
+      })
+    })
+      .then(function(r){
+        if(r && r.ok){
+          showMsg('✅ ' + r.msg, 'ok');
+          var ua = document.getElementById('uActual');
+          ua.textContent = nuevo; ua.classList.remove('empty');
+          clienteSel.telefono = nuevo;
+        } else {
+          showMsg('⚠️ ' + (r && r.msg ? r.msg : 'No se pudo guardar.'), 'err');
+        }
+        btn.textContent = '💾 Guardar actualización';
+        btn.disabled = false;
+      })
+      .catch(function(err){
+        showMsg('⚠️ Error: ' + (err && err.message ? err.message : 'desconocido'), 'err');
+        btn.textContent = '💾 Guardar actualización';
+        btn.disabled = false;
+      });
+  });
+</script>
+</body>
+</html>
