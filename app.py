@@ -1,11 +1,16 @@
 import sqlite3
 from pathlib import Path
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 PROJECT_ROOT = Path(__file__).parent
 DB_PATH = PROJECT_ROOT / "clientes.db"
 
 app = Flask(__name__, template_folder=".", static_folder=".")
+
+
+@app.route('/favicon.png')
+def favicon():
+    return send_from_directory(str(PROJECT_ROOT), 'favicon.png')
 
 
 def normalize_code(value: object) -> str:
