@@ -13,6 +13,12 @@ def favicon():
     return send_from_directory(str(PROJECT_ROOT), 'favicon.png')
 
 
+@app.route('/favicon.ico')
+def favicon_ico():
+    # Some browsers request /favicon.ico by default — redirect to the PNG favicon
+    return redirect('/favicon.png')
+
+
 def normalize_code(value: object) -> str:
     if value is None:
         return ""
