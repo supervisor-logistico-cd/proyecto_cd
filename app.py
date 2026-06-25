@@ -85,7 +85,11 @@ def api_detalle():
 
         def parse_float(value):
             try:
-                return float(value)
+                v = float(value)
+                # algunos datos vienen en "microgrados" (ej. 7075039 -> 7.075039)
+                if abs(v) > 90:
+                    v = v / 1e6
+                return v
             except Exception:
                 return None
 
